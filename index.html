@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>for @ you - 20 Minute Game Hub</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    #lock-message {
+      font-size: 24px;
+      color: red;
+      display: none;
+    }
+    #timer {
+      font-size: 32px;
+      margin-bottom: 20px;
+    }
+    .hidden {
+      display: none;
+    }
+    .category {
+      margin: 10px;
+      padding: 10px;
+      background: #e0ffe0;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .dark-mode {
+      background-color: #121212;
+      color: #e0e0e0;
+    }
+    .toggle-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 8px 16px;
+      background-color: #008000;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .admin-panel {
+      margin-top: 30px;
+      padding: 10px;
+      border: 2px dashed #888;
+    }
+    .game-frame {
+      width: 80%;
+      height: 400px;
+      margin: 20px auto;
+      border: 2px solid #000;
+      display: none;
+    }
+    #login-section {
+      margin-bottom: 20px;
+    }
+    #progress-log {
+      margin-top: 20px;
+      font-size: 16px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <button class="toggle-btn" onclick="toggleMode()">Toggle Dark/Light</button>
+
+  <h1>Welcome to <em>for @ you</em> - Game Hub!</h1>
+
+  <div id="login-section">
+    <input type="text" id="username" placeholder="Enter your name" />
+    <button onclick="loginUser()">Login</button>
+  </div>
+
+  <div id="timer" role="status"></div>
+
+  <div id="content" class="hidden">
+    <h2>Choose a Category</h2>
+    <div class="category" onclick="loadGame('memory')">🧠 Memory Games</div>
+    <div class="category" onclick="loadGame('science')">🔬 Science Games</div>
+    <div class="category" onclick="loadGame('fun')">🎮 Fun Games</div>
+    <div class="category" onclick="loadGame('puzzle')">🧩 Puzzle Games</div>
+    <div class="category" onclick="loadGame('action')">⚔️ Action Games</div>
+    <div class="category" onclick="loadGame('sports')">🏀 Sports Games</div>
+    <div class="category" onclick="loadGame('adventure')">🌍 Adventure Games</div>
+
+    <iframe id="game-frame" class="game-frame"></iframe>
+    <div id="progress-log"></div>
+  </div>
+
+  <div id="lock-message">Access locked. Come back tomorrow!</div>
+
+  <div class="admin-panel">
+    <h3>Admin Access</h3>
+    <p>Today's password: <strong id="admin-pass"></strong></p>
+  </div>
+
+  <script>
+    const LOCK_KEY = "playSiteLockedUntil";
+    const START_KEY = "playSiteStartTime";
+    const USER_KEY = "playSiteUser";
+    const MAX_TIME = 20 * 60 * 1000;
+
+    const timerEl = document.getElementById("timer");
+    const contentEl = document.getElementById("content");
+    const lockMsgEl = document.getElementById("lock-message");
+    const adminPassEl = document.getElementById("admin-pass");
+    const gameFrame = document.getElementById("game-frame");
+    const loginSection = document.getElementById("login-section");
+    const progressLog = document.getElementById("progress-log");
+
+    const alertSound = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
+
+    const games = {
+      memory: "https://cdn.htmlgames.com/Memory/html5game/index.html",
+      science: "https://cdn.htmlgames.com/PeriodicTable/html5game/index.html",
+      fun: "https://cdn.htmlgames.com/MergeFish/html5game/index.html",
+      puzzle: "https://cdn.htmlgames.com/DailyShikaku/html5game/index.html",
+      action: "https://cdn.htmlgames.com/HexEmpire/html5game/index.html",
+      sports: "https://cdn.htmlgames.com/Basketball/html5game/index.html",
+      adventure: "https://cdn.htmlgames.com/IslandAdventure/html5game/index.html"
+    };
+
+    function isLocked() {
+      const lockUntil = localStorage.getItem(LOCK_KEY);
+      return lockUntil && new Date().getTime() < parseInt(lockUntil);
+    }
+
+    function lockSite() {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setHours(24, 0, 0, 0);
+      localStorage.setItem(LOCK_KEY, tomorrow.getTime());
+      showLocked();
+    }
+
+    function showLocked() {
+      contentEl.classList.add("hidden");
+      timerEl.style.display = "none";
+      loginSection.style.display = "none";
+      lockMsgEl.style.display = "block";
+    }
+
+    function startSession() {
+      const startTime = new Date().getTime();
+      localStorage.setItem(START_KEY, startTime);
+      updateTimer();
+    }
+
+    function updateTimer() {
+      const start = parseInt(localStorage.getItem(START_KEY));
+      const now = new Date().getTime();
+      const remaining = MAX_TIME - (now - start);
+
+      if (remaining <= 0) {
+        alertSound.play();
+        lockSite();
+        return;
+      }
+
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      timerEl.textContent = `Time remaining: ${minutes}m ${seconds}s`;
+
+      setTimeout(updateTimer, 1000);
+    }
+
+    function generateAdminPassword() {
+      const date = new Date();
+      const seed = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) {
+        hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const pass = (hash >>> 0).toString(36).substr(0, 6);
+      adminPassEl.textContent = pass;
+    }
+
+    function toggleMode() {
+      document.body.classList.toggle("dark-mode");
+    }
+
+    function loginUser() {
+      const username = document.getElementById("username").value.trim();
+      if (username) {
+        localStorage.setItem(USER_KEY, username);
+        loginSection.style.display = "none";
+        contentEl.classList.remove("hidden");
+        showProgress();
+      } else {
+        alert("Please enter your name to start playing.");
+      }
+    }
+
+    function loadGame(category) {
+      const gameUrl = games[category];
+      gameFrame.src = gameUrl;
+      gameFrame.style.display = "block";
+
+      const user = localStorage.getItem(USER_KEY);
+      const progress = JSON.parse(localStorage.getItem("userProgress") || "{}");
+      progress[user] = progress[user] || [];
+      progress[user].push({ game: category, time: new Date().toLocaleTimeString() });
+      localStorage.setItem("userProgress", JSON.stringify(progress));
+      showProgress();
+    }
+
+    function showProgress() {
+      const user = localStorage.getItem(USER_KEY);
+      const progress = JSON.parse(localStorage.getItem("userProgress") || "{}");
+      if (progress[user]) {
+        progressLog.innerHTML = `<strong>Your Game History:</strong><br>` + progress[user]
+          .map(entry => `Played ${entry.game} at ${entry.time}`)
+          .join("<br>");
+      }
+    }
+
+    generateAdminPassword();
+
+    if (isLocked()) {
+      showLocked();
+    } else {
+      if (!localStorage.getItem(START_KEY)) {
+        startSession();
+      } else {
+        updateTimer();
+      }
+
+      if (localStorage.getItem(USER_KEY)) {
+        loginSection.style.display = "none";
+        contentEl.classList.remove("hidden");
+        showProgress();
+      }
+    }
+  </script>
+</body>
+</html>
